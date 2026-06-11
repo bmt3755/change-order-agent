@@ -1,0 +1,79 @@
+GENERAL CONTRACT FOR CONSTRUCTION SERVICES
+Mission Bay Hospital — San Francisco, CA
+Contract Value: $400,000,000
+Contract Version: v1.0
+
+================================================================================
+SECTION 3 — SCOPE OF WORK
+================================================================================
+
+3.1 BASE SCOPE
+The General Contractor shall furnish all labor, materials, equipment, and services
+necessary to complete the construction of Mission Bay Hospital as described in the
+Contract Documents. The base scope includes all work identified in the drawings
+and specifications issued as of the contract execution date.
+
+3.2 ELECTRICAL WORK
+All electrical work within the base scope includes standard conduit runs, panel
+installations, and lighting as identified in the MEP drawings (Revision 3, dated
+January 15, 2024). Any electrical work required for specialized medical equipment
+rooms — including MRI suites, CT scan rooms, and surgical theaters — is explicitly
+EXCLUDED from the base scope and shall be treated as a change order requiring
+owner approval regardless of dollar amount, due to the specialized shielding and
+power requirements involved.
+
+3.3 STRUCTURAL MODIFICATIONS
+Structural modifications not shown on the approved structural drawings (Revision 2,
+dated January 10, 2024) are EXCLUDED from the base scope. Any request to alter
+load-bearing elements, add openings in shear walls, or modify the foundation system
+shall be treated as out-of-scope work and routed directly to the owner's structural
+engineer for review before any approval is granted.
+
+3.4 MECHANICAL AND PLUMBING
+Standard HVAC installation, plumbing rough-in, and medical gas piping as specified
+in the MEP package are INCLUDED in the base scope. Modifications to the medical gas
+system beyond the approved layout, or additions of HVAC zones not shown on the
+approved drawings, are EXCLUDED and require a change order.
+
+3.5 CIVIL AND SITE WORK
+All site grading, paving, underground utilities, and landscaping shown on the civil
+drawings (Revision 1, dated December 20, 2023) are INCLUDED. Additional site work
+beyond the approved civil package requires a change order and civil engineer review.
+
+================================================================================
+SECTION 7 — CHANGE ORDER PROCEDURES
+================================================================================
+
+7.1 CHANGE ORDER THRESHOLD AND APPROVAL AUTHORITY
+Change orders shall be approved according to the following dollar thresholds:
+  - Up to $25,000:     Site Superintendent approval required
+  - $25,001–$100,000:  Project Manager approval required
+  - $100,001–$500,000: Owner's Representative approval required
+  - Above $500,000:    Owner (Mission Bay Health System) approval required
+
+All out-of-scope change orders, regardless of dollar value, require Owner approval.
+
+7.2 CHANGE ORDER DOCUMENTATION REQUIREMENTS
+All change orders must include: scope description, cost breakdown, schedule impact
+assessment, reference to the contract section being modified, and subcontractor
+certification that the work is not included in the base contract price.
+
+7.3 AUDIT AND RECORD RETENTION
+All approved change orders and supporting documentation must be retained for a
+minimum of seven (7) years following project completion. The General Contractor
+is responsible for maintaining a complete and auditable change order log.
+
+================================================================================
+SECTION 12 — DISPUTE RESOLUTION
+================================================================================
+
+12.1 CHANGE ORDER DISPUTES
+Any dispute regarding scope inclusion or exclusion shall first be submitted in
+writing to the Owner's Representative within 14 days of the disputed work being
+performed. Failure to submit within 14 days constitutes acceptance of the
+original contract price for that work.
+
+12.2 ARBITRATION
+Unresolved disputes shall be submitted to binding arbitration under the American
+Arbitration Association Construction Industry Rules. The prevailing party shall
+be entitled to recover reasonable attorneys' fees and arbitration costs.
