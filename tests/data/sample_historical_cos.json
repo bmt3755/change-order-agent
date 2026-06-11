@@ -1,0 +1,58 @@
+[
+  {
+    "co_id": "HIST-001",
+    "work_type": "electrical",
+    "description": "Additional conduit runs and receptacles in the nurse station on Floor 3",
+    "requested_amount": 28500,
+    "settled_amount": 24000,
+    "scope_ruling": "IN_SCOPE"
+  },
+  {
+    "co_id": "HIST-002",
+    "work_type": "electrical",
+    "description": "Specialized power and shielding conduit installation for MRI Room 1",
+    "requested_amount": 87000,
+    "settled_amount": 79500,
+    "scope_ruling": "OUT_OF_SCOPE"
+  },
+  {
+    "co_id": "HIST-003",
+    "work_type": "structural",
+    "description": "Additional steel reinforcement for load-bearing wall opening on Floor 2",
+    "requested_amount": 145000,
+    "settled_amount": 138000,
+    "scope_ruling": "OUT_OF_SCOPE"
+  },
+  {
+    "co_id": "HIST-004",
+    "work_type": "plumbing",
+    "description": "Extended medical gas piping to two additional patient rooms on Floor 4",
+    "requested_amount": 31000,
+    "settled_amount": 29000,
+    "scope_ruling": "OUT_OF_SCOPE"
+  },
+  {
+    "co_id": "HIST-005",
+    "work_type": "mechanical",
+    "description": "Additional HVAC zone for the pharmacy storage room",
+    "requested_amount": 42000,
+    "settled_amount": 38500,
+    "scope_ruling": "OUT_OF_SCOPE"
+  },
+  {
+    "co_id": "HIST-006",
+    "work_type": "electrical",
+    "description": "Upgraded panel capacity for surgical theater power requirements",
+    "requested_amount": 62000,
+    "settled_amount": 55000,
+    "scope_ruling": "OUT_OF_SCOPE"
+  },
+  {
+    "co_id": "HIST-007",
+    "work_type": "civil",
+    "description": "Additional grading and drainage for the emergency vehicle access road",
+    "requested_amount": 95000,
+    "settled_amount": 88000,
+    "scope_ruling": "IN_SCOPE"
+  }
+]
