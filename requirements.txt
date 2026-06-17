@@ -1,0 +1,10 @@
+# Pinned to the versions this project was built and tested against
+# (verified locally; smoke suite passes on these).
+langgraph==1.2.0
+langgraph-checkpoint-sqlite==3.1.0
+openai==2.37.0
+chromadb==1.5.9
+pydantic==2.12.5
+langsmith==0.6.9
+python-dotenv==1.2.1
+pytest==9.0.3
