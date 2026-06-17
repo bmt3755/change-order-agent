@@ -42,7 +42,7 @@ def test_state_instantiation():
     state = _make_state()
     assert state.input.co_id == "CO-001"
     assert state.pipeline.status.value == "RUNNING"
-    assert state.pipeline.awaiting_david_approval is False
+    assert state.pipeline.awaiting_approval is False
 
 
 def test_redaction_warning_logged(caplog):
@@ -91,7 +91,7 @@ def test_gate_halts_on_low_confidence():
     assert _gate_after_scope(state) == "halt"
 
 
-def test_gate_halts_when_pipeline_awaiting_david():
+def test_gate_halts_when_pipeline_awaiting_review():
     from change_order_agent.graph.graph import _gate_after_scope
     from change_order_agent.state.change_order_state import (
         PipelineControl, PipelineStatus, ScopeAnalysisOutput, ScopeRuling,
@@ -101,7 +101,7 @@ def test_gate_halts_when_pipeline_awaiting_david():
             scope_ruling=ScopeRuling.IN_SCOPE,
             confidence_score=0.9,
         ),
-        pipeline=PipelineControl(status=PipelineStatus.AWAITING_DAVID),
+        pipeline=PipelineControl(status=PipelineStatus.AWAITING_REVIEW),
     )
     assert _gate_after_scope(state) == "halt"
 

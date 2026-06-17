@@ -81,7 +81,7 @@ def run_cost_estimation_agent(state: ChangeOrderState) -> dict:
         return {
             "cost_estimation": CostEstimationOutput(
                 estimated_at=datetime.now(timezone.utc),
-                error=f"CO {co_id}: no historical data — David must provide cost benchmark manually",
+                error=f"CO {co_id}: no historical data — a human must provide cost benchmark manually",
             ),
         }
 
@@ -98,8 +98,9 @@ def run_cost_estimation_agent(state: ChangeOrderState) -> dict:
         }
 
     logger.info(
-        "CO %s: cost estimation complete — range $%,.0f–$%,.0f",
-        co_id, result.estimated_cost_low, result.estimated_cost_high,
+        "CO %s: cost estimation complete — range %s",
+        co_id,
+        f"${result.estimated_cost_low:,.0f}–${result.estimated_cost_high:,.0f}",
     )
 
     return {

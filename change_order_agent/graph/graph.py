@@ -32,14 +32,14 @@ CHECKPOINT_DB_PATH = os.environ.get("CHECKPOINT_DB_PATH", "./checkpoints.db")
 def _gate_after_scope(state: ChangeOrderState) -> str:
     """
     Implements the tiered confidence gating logic from Step 7.
-    LOW confidence halts the pipeline — David must intervene before routing.
-    Any upstream AWAITING_DAVID / FAILED / HALTED status also halts.
+    LOW confidence halts the pipeline — a human must intervene before routing.
+    Any upstream AWAITING_REVIEW / FAILED / HALTED status also halts.
     """
     pi = state.pipeline
     sa = state.scope_analysis
 
     if pi.status in (
-        PipelineStatus.AWAITING_DAVID,
+        PipelineStatus.AWAITING_REVIEW,
         PipelineStatus.FAILED,
         PipelineStatus.HALTED,
     ):
@@ -52,14 +52,14 @@ def _gate_after_scope(state: ChangeOrderState) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Completion node — runs after David approves (post-interrupt resume)
+# Completion node — runs after the reviewer approves (post-interrupt resume)
 # ---------------------------------------------------------------------------
 
 def _complete_pipeline(state: ChangeOrderState) -> dict:
     """
     Runs after Tasks 7 and 8 complete (parallel Window 2).
     Checks for errors from parallel agents, then marks the pipeline complete
-    and pauses for David's approval (human-in-the-loop interrupt fires before this node).
+    and pauses for the reviewer's approval (human-in-the-loop interrupt fires before this node).
     """
     co_id = state.input.co_id
 
@@ -74,20 +74,20 @@ def _complete_pipeline(state: ChangeOrderState) -> dict:
         logger.error("CO %s: parallel agent errors: %s", co_id, "; ".join(errors))
         return {
             "pipeline": state.pipeline.model_copy(update={
-                "status": PipelineStatus.AWAITING_DAVID,
+                "status": PipelineStatus.AWAITING_REVIEW,
                 "current_node": "complete",
-                "awaiting_david_approval": True,
+                "awaiting_approval": True,
                 "error_message": "; ".join(errors),
             })
         }
 
-    logger.info("CO %s: pipeline complete — David approved", co_id)
+    logger.info("CO %s: pipeline complete — reviewer approved", co_id)
     return {
         "pipeline": state.pipeline.model_copy(update={
             "status": PipelineStatus.COMPLETE,
             "current_node": "complete",
-            "awaiting_david_approval": False,
-            "david_approved_at": datetime.now(timezone.utc),
+            "awaiting_approval": False,
+            "approved_at": datetime.now(timezone.utc),
         })
     }
 
@@ -149,7 +149,7 @@ def build_graph() -> StateGraph:
 def compile_app():
     """
     Compile the graph with SqliteSaver checkpointing and a pre-completion interrupt.
-    The interrupt pauses before 'complete' so David can review the report and
+    The interrupt pauses before 'complete' so the reviewer can review the report and
     escalation draft before the pipeline is marked finished.
     """
     # Direct instantiation required in LangGraph 1.x — from_conn_string returns a context manager
@@ -158,7 +158,7 @@ def compile_app():
     builder = build_graph()
     return builder.compile(
         checkpointer=checkpointer,
-        interrupt_before=["complete"],  # human-in-the-loop pause — David reviews here
+        interrupt_before=["complete"],  # human-in-the-loop pause — the reviewer reviews here
     )
 
 

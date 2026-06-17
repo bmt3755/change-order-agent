@@ -89,7 +89,7 @@ def _determine_approval_stage(state: ChangeOrderState) -> ApprovalStage:
 
 
 # ---------------------------------------------------------------------------
-# Escalation draft — LLM generates professional email, David reviews before sending
+# Escalation draft — LLM generates professional email, the reviewer reviews before sending
 # ---------------------------------------------------------------------------
 
 class _DraftResult(BaseModel):
@@ -121,7 +121,7 @@ Write:
 Paragraph 2: scope ruling and confidence. Paragraph 3: cost context. \
 Paragraph 4: what action is needed from the approver.
 
-Do not add a greeting or sign-off — David will personalise those before sending."""
+Do not add a greeting or sign-off — the reviewer will personalise those before sending."""
 
 _TEMPLATE_DRAFT = """\
 Subject: Change Order {co_id} — {work_type} — Action Required
@@ -193,14 +193,14 @@ def _try_llm_draft(context: dict, co_id: str) -> Optional[str]:
             if parsed is None:
                 logger.warning("CO %s: draft attempt %d returned None", co_id, attempt)
                 continue
-            return f"Subject: {parsed.subject}\n\n{parsed.body}\n\n[DRAFT — requires David's review and approval before sending]"
+            return f"Subject: {parsed.subject}\n\n{parsed.body}\n\n[DRAFT — requires review and approval before sending]"
         except Exception as exc:
             logger.warning("CO %s: draft attempt %d failed: %s", co_id, attempt, exc)
     return None
 
 
 # ---------------------------------------------------------------------------
-# Report assembly — David's full dashboard view
+# Report assembly — the reviewer's full dashboard view
 # ---------------------------------------------------------------------------
 
 def _assemble_report(
@@ -251,7 +251,7 @@ def _assemble_report(
 
 @traceable(name="output_assembly_agent")
 def run_output_assembly_agent(state: ChangeOrderState) -> dict:
-    """Task 8: Assemble the final report and escalation draft for David's review."""
+    """Task 8: Assemble the final report and escalation draft for review."""
     co_id = state.input.co_id
     logger.info("CO %s: output_assembly_agent starting", co_id)
 
@@ -283,10 +283,10 @@ def run_output_assembly_agent(state: ChangeOrderState) -> dict:
         logger.warning("CO %s: LLM draft failed — using template fallback", co_id)
         draft = (
             _TEMPLATE_DRAFT.format(**context)
-            + "\n\n[DRAFT — auto-generated fallback — requires David's review and approval before sending]"
+            + "\n\n[DRAFT — auto-generated fallback — requires review and approval before sending]"
         )
 
-    logger.info("CO %s: output assembly complete — report and draft ready for David", co_id)
+    logger.info("CO %s: output assembly complete — report and draft ready for review", co_id)
 
     return {
         "assembly": AssemblyOutput(

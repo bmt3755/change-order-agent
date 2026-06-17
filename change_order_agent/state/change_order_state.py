@@ -22,8 +22,8 @@ class ScopeRuling(str, Enum):
 
 class ConfidenceTier(str, Enum):
     HIGH = "HIGH"      # >= 0.75 — proceed normally
-    MEDIUM = "MEDIUM"  # 0.45–0.74 — proceed with flag in David's report
-    LOW = "LOW"        # < 0.45 — halt pipeline, escalate to David
+    MEDIUM = "MEDIUM"  # 0.45–0.74 — proceed with flag in the reviewer's report
+    LOW = "LOW"        # < 0.45 — halt pipeline, escalate to the reviewer
 
 
 class ApproverLevel(str, Enum):
@@ -50,8 +50,8 @@ class ApprovalStage(str, Enum):
 
 class PipelineStatus(str, Enum):
     RUNNING = "RUNNING"
-    AWAITING_DAVID = "AWAITING_DAVID"  # human-in-the-loop pause
-    HALTED = "HALTED"                  # low confidence — David must intervene
+    AWAITING_REVIEW = "AWAITING_REVIEW"  # human-in-the-loop pause
+    HALTED = "HALTED"                    # low confidence — a human must intervene
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
 
@@ -142,8 +142,8 @@ class RoutingOutput(BaseModel):
 class AssemblyOutput(BaseModel):
     approval_stage: Optional[ApprovalStage] = None
     risk_score: Optional[RiskScore] = None
-    full_report: Optional[str] = None      # complete report delivered to David's dashboard
-    escalation_draft: Optional[str] = None  # email draft — held for David's review before sending
+    full_report: Optional[str] = None      # complete report delivered to the reviewer's dashboard
+    escalation_draft: Optional[str] = None  # email draft — held for review before sending
     report_delivered: bool = False
     delivered_at: Optional[datetime] = None
     error: Optional[str] = None  # set by parallel agent — checked by complete node
@@ -166,8 +166,8 @@ class AuditReference(BaseModel):
 class PipelineControl(BaseModel):
     status: PipelineStatus = PipelineStatus.RUNNING
     current_node: Optional[str] = None
-    awaiting_david_approval: bool = False
-    david_approved_at: Optional[datetime] = None
+    awaiting_approval: bool = False
+    approved_at: Optional[datetime] = None
     error_message: Optional[str] = None
 
 

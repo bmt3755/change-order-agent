@@ -86,10 +86,10 @@ def run_extraction_agent(state: ChangeOrderState) -> dict:
         logger.warning("CO %s: primary extraction failed — trying fallback", co_id)
         result = _try_fallback(document, co_id)
 
-    # --- Flag-to-David path ---
+    # --- Flag-for-review path ---
     if result is None:
-        logger.error("CO %s: both extraction paths failed — flagging for David", co_id)
-        return _flag_for_david(state)
+        logger.error("CO %s: both extraction paths failed — flagging for review", co_id)
+        return _flag_for_review(state)
 
     logger.info(
         "CO %s: extraction complete — work_type=%s amount=%s flagged=%s",
@@ -172,14 +172,14 @@ def _try_fallback(document: str, co_id: str) -> Optional[ExtractionOutput]:
 # State update helpers
 # ---------------------------------------------------------------------------
 
-def _flag_for_david(state: ChangeOrderState) -> dict:
+def _flag_for_review(state: ChangeOrderState) -> dict:
     return {
         "extraction": ExtractionOutput(
             flagged_missing_amount=True,
             extracted_at=datetime.now(timezone.utc),
         ),
         "pipeline": state.pipeline.model_copy(update={
-            "status": PipelineStatus.AWAITING_DAVID,
+            "status": PipelineStatus.AWAITING_REVIEW,
             "current_node": "extraction_agent",
             "error_message": f"CO {state.input.co_id}: extraction failed on both paths",
         }),

@@ -69,9 +69,9 @@ def _resolve_dollar_amount(state: ChangeOrderState) -> Optional[float]:
         return state.extraction.dollar_amount_requested
     if state.cost_estimation.estimated_cost_high is not None:
         logger.warning(
-            "CO %s: dollar amount missing — using cost estimate high end ($%,.0f) for routing",
+            "CO %s: dollar amount missing — using cost estimate high end (%s) for routing",
             state.input.co_id,
-            state.cost_estimation.estimated_cost_high,
+            f"${state.cost_estimation.estimated_cost_high:,.0f}",
         )
         return state.cost_estimation.estimated_cost_high
     return None
@@ -148,7 +148,7 @@ def run_routing_agent(state: ChangeOrderState) -> dict:
 
     if state.scope_analysis.scope_ruling is None:
         logger.error("CO %s: scope ruling is None — cannot route", co_id)
-        return _flag_for_david(
+        return _flag_for_review(
             state, f"CO {co_id}: routing skipped — no scope ruling available"
         )
 
@@ -156,7 +156,7 @@ def run_routing_agent(state: ChangeOrderState) -> dict:
 
     if dollar_amount is None:
         logger.error("CO %s: no dollar amount or cost estimate — cannot determine approval level", co_id)
-        return _flag_for_david(
+        return _flag_for_review(
             state,
             f"CO {co_id}: routing skipped — no dollar amount or cost estimate available",
         )
@@ -166,8 +166,8 @@ def run_routing_agent(state: ChangeOrderState) -> dict:
     department = _determine_department(state.extraction.work_type)
 
     logger.info(
-        "CO %s: routing decision — approver=%s department=%s dollar_basis=$%,.0f",
-        co_id, approver_level.value, department, dollar_amount,
+        "CO %s: routing decision — approver=%s department=%s dollar_basis=%s",
+        co_id, approver_level.value, department, f"${dollar_amount:,.0f}",
     )
 
     # Task 6 — assemble package and dispatch
@@ -178,7 +178,7 @@ def run_routing_agent(state: ChangeOrderState) -> dict:
         routing_executed = True
     except Exception as exc:
         logger.error("CO %s: package assembly failed: %s", co_id, exc)
-        return _flag_for_david(
+        return _flag_for_review(
             state, f"CO {co_id}: routing package assembly failed — {exc}"
         )
 
@@ -200,11 +200,11 @@ def run_routing_agent(state: ChangeOrderState) -> dict:
 # State update helper
 # ---------------------------------------------------------------------------
 
-def _flag_for_david(state: ChangeOrderState, reason: str) -> dict:
+def _flag_for_review(state: ChangeOrderState, reason: str) -> dict:
     return {
         "routing": RoutingOutput(),
         "pipeline": state.pipeline.model_copy(update={
-            "status": PipelineStatus.AWAITING_DAVID,
+            "status": PipelineStatus.AWAITING_REVIEW,
             "current_node": "routing_agent",
             "error_message": reason,
         }),

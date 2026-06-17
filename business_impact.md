@@ -33,7 +33,7 @@ no agent can disagree about what "low confidence" means.
 ### 3. One conditional branch point: the tiered confidence gate
 **Technical reason:** The graph has a single conditional edge, after scope analysis
 (`_gate_after_scope`). It halts the pipeline on a LOW score, a missing ruling, or any upstream
-`AWAITING_DAVID / FAILED / HALTED` status; HIGH/MEDIUM continue.
+`AWAITING_REVIEW / FAILED / HALTED` status; HIGH/MEDIUM continue.
 **Business consequence:** An uncertain or failed scope ruling cannot silently flow into routing
 and approval. Ambiguity becomes a human decision instead of an automated guess.
 **Risk / cost impact:** Reduces dispute / litigation risk from wrong autonomous rulings.

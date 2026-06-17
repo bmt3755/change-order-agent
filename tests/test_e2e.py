@@ -6,7 +6,7 @@ What this does:
   1. Seeds the contract vector store with sample_contract.txt
   2. Seeds the historical CO vector store with sample_historical_cos.json
   3. Runs one change order through the full pipeline
-  4. Prints David's report and escalation draft
+  4. Prints the reviewer's report and escalation draft
 """
 from __future__ import annotations
 
@@ -117,7 +117,7 @@ def test_in_scope_co_runs_full_pipeline(capsys):
     result = process_change_order(state)
 
     print(f"\nPipeline status:     {result.pipeline.status.value}")
-    print(f"Awaiting David:      {result.pipeline.awaiting_david_approval}")
+    print(f"Awaiting review:     {result.pipeline.awaiting_approval}")
     print(f"Scope ruling:        {result.scope_analysis.scope_ruling}")
     print(f"Confidence score:    {result.scope_analysis.confidence_score}")
     print(f"Confidence tier:     {result.scope_analysis.confidence_tier}")

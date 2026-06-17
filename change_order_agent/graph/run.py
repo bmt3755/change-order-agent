@@ -21,8 +21,8 @@ def _config(co_id: str) -> dict:
 def process_change_order(state: ChangeOrderState) -> ChangeOrderState:
     """
     Run the full pipeline for one change order.
-    Stops before 'complete' node — David reviews report and draft before approving.
-    Returns the paused state for David's inspection.
+    Stops before 'complete' node — the reviewer reviews report and draft before approving.
+    Returns the paused state for the reviewer's inspection.
     """
     co_id = state.input.co_id
     logger.info("CO %s: pipeline starting", co_id)
@@ -31,36 +31,36 @@ def process_change_order(state: ChangeOrderState) -> ChangeOrderState:
     final_state = ChangeOrderState(**result)
 
     logger.info(
-        "CO %s: pipeline paused — status=%s awaiting_david=%s",
+        "CO %s: pipeline paused — status=%s awaiting_approval=%s",
         co_id,
         final_state.pipeline.status.value,
-        final_state.pipeline.awaiting_david_approval,
+        final_state.pipeline.awaiting_approval,
     )
     return final_state
 
 
 # ---------------------------------------------------------------------------
-# Resume after David approves
+# Resume after the reviewer approves
 # ---------------------------------------------------------------------------
 
 def approve_and_complete(co_id: str) -> ChangeOrderState:
     """
-    Resume the pipeline after David reviews and approves the report and escalation draft.
+    Resume the pipeline after the reviewer reviews and approves the report and escalation draft.
     Runs the 'complete' node — marks the CO as fully processed.
     """
-    logger.info("CO %s: David approved — resuming pipeline to completion", co_id)
+    logger.info("CO %s: reviewer approved — resuming pipeline to completion", co_id)
     result = app.invoke(None, config=_config(co_id))
     return ChangeOrderState(**result)
 
 
 # ---------------------------------------------------------------------------
-# Query current state — David's dashboard view
+# Query current state — the reviewer's dashboard view
 # ---------------------------------------------------------------------------
 
 def get_current_state(co_id: str) -> Optional[ChangeOrderState]:
     """
     Retrieve the current state of a CO pipeline without advancing it.
-    Used by David's dashboard to display status, report, and draft.
+    Used by the reviewer's dashboard to display status, report, and draft.
     """
     snapshot = app.get_state(config=_config(co_id))
     if not snapshot.values:
@@ -70,12 +70,12 @@ def get_current_state(co_id: str) -> Optional[ChangeOrderState]:
 
 
 # ---------------------------------------------------------------------------
-# Halt without completing — David rejects or overrides
+# Halt without completing — the reviewer rejects or overrides
 # ---------------------------------------------------------------------------
 
 def reject_and_halt(co_id: str, reason: str) -> ChangeOrderState:
     """
-    Update the pipeline state to HALTED when David rejects the report or overrides the system.
+    Update the pipeline state to HALTED when the reviewer rejects the report or overrides the system.
     Does not resume — the CO is flagged for manual handling.
     """
     from ..state.change_order_state import PipelineStatus
@@ -88,8 +88,8 @@ def reject_and_halt(co_id: str, reason: str) -> ChangeOrderState:
     current = ChangeOrderState(**snapshot.values)
     updated_pipeline = current.pipeline.model_copy(update={
         "status": PipelineStatus.HALTED,
-        "awaiting_david_approval": False,
-        "error_message": f"Rejected by David: {reason}",
+        "awaiting_approval": False,
+        "error_message": f"Rejected by reviewer: {reason}",
     })
 
     app.update_state(
@@ -97,5 +97,5 @@ def reject_and_halt(co_id: str, reason: str) -> ChangeOrderState:
         values={"pipeline": updated_pipeline},
     )
 
-    logger.info("CO %s: pipeline halted by David — reason: %s", co_id, reason)
+    logger.info("CO %s: pipeline halted by the reviewer — reason: %s", co_id, reason)
     return get_current_state(co_id)

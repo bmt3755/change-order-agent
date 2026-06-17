@@ -97,7 +97,7 @@ def run_scope_analysis_agent(state: ChangeOrderState) -> dict:
 
     if not state.retrieval.contract_sections:
         logger.error("CO %s: no contract sections — cannot determine scope", co_id)
-        return _flag_for_david(
+        return _flag_for_review(
             state,
             f"CO {co_id}: scope analysis skipped — no contract sections in state.retrieval",
         )
@@ -106,10 +106,10 @@ def run_scope_analysis_agent(state: ChangeOrderState) -> dict:
 
     if result is None:
         logger.error(
-            "CO %s: scope analysis failed after %d attempts — flagging for David",
+            "CO %s: scope analysis failed after %d attempts — flagging for review",
             co_id, MAX_ATTEMPTS,
         )
-        return _flag_for_david(
+        return _flag_for_review(
             state,
             f"CO {co_id}: scope analysis LLM call failed on all attempts",
         )
@@ -196,13 +196,13 @@ def _try_scope_analysis(
 # State update helpers
 # ---------------------------------------------------------------------------
 
-def _flag_for_david(state: ChangeOrderState, reason: str) -> dict:
+def _flag_for_review(state: ChangeOrderState, reason: str) -> dict:
     return {
         "scope_analysis": ScopeAnalysisOutput(
             analyzed_at=datetime.now(timezone.utc),
         ),
         "pipeline": state.pipeline.model_copy(update={
-            "status": PipelineStatus.AWAITING_DAVID,
+            "status": PipelineStatus.AWAITING_REVIEW,
             "current_node": "scope_analysis_agent",
             "error_message": reason,
         }),
