@@ -33,13 +33,13 @@ flowchart TD
     COST --> SCOPE
 
     SCOPE --> GATE{Confidence gate}
-    GATE -->|LOW / no ruling / upstream failure| HALT([Halt — escalate to David])
+    GATE -->|LOW / no ruling / upstream failure| HALT([Halt — escalate to reviewer])
     GATE -->|HIGH or MEDIUM| ROUTE[Routing Agent<br/>approver + package]
 
     ROUTE --> ASM[Output Assembly Agent<br/>report + risk + draft]
     ROUTE --> AUD[Audit Logger<br/>full state to SQLite]
 
-    ASM --> HITL{{Human review — David approves}}
+    ASM --> HITL{{Human review — reviewer approves}}
     AUD --> HITL
     HITL --> DONE([Complete])
 ```
@@ -61,27 +61,27 @@ flowchart TD
 This mirrors the real graph wiring in [`graph/graph.py`](change_order_agent/graph/graph.py).
 The **only** conditional branch is the confidence gate after scope analysis. Internal
 fallbacks (extraction fallback, scope retries, the escalation template fallback) live
-*inside* nodes and surface as pipeline state — a node that "flags for David" sets the
+*inside* nodes and surface as pipeline state — a node that "flags for review" sets the
 pipeline status, which the gate then halts on.
 
 ```mermaid
 flowchart TD
-    START([START]) --> EX[Extraction Agent<br/>primary x2 → fallback → flag for David]
+    START([START]) --> EX[Extraction Agent<br/>primary x2 → fallback → flag for review]
 
     EX --> RET[Retrieval Agent<br/>Chroma: contract_corpus, top_k=6<br/>filter: org + project + contract_version]
     EX --> COST[Cost Estimation Agent<br/>Chroma: historical_cos, top_k=4<br/>+ LLM cost range]
 
-    RET --> SCOPE[Scope Analysis Agent<br/>IN / OUT / AMBIGUOUS<br/>confidence + required clause citation<br/>2 attempts → flag for David]
+    RET --> SCOPE[Scope Analysis Agent<br/>IN / OUT / AMBIGUOUS<br/>confidence + required clause citation<br/>2 attempts → flag for review]
     COST --> SCOPE
 
     SCOPE --> GATE{Tiered confidence gate}
-    GATE -->|LOW score · no ruling · upstream AWAITING/FAILED/HALTED| HALT([END — halted for David])
-    GATE -->|HIGH or MEDIUM| ROUTE[Routing Agent · deterministic<br/>$ thresholds; OUT_OF_SCOPE → OWNER<br/>missing inputs → flag for David]
+    GATE -->|LOW score · no ruling · upstream AWAITING/FAILED/HALTED| HALT([END — halted for review])
+    GATE -->|HIGH or MEDIUM| ROUTE[Routing Agent · deterministic<br/>$ thresholds; OUT_OF_SCOPE → OWNER<br/>missing inputs → flag for review]
 
     ROUTE --> ASM[Output Assembly Agent<br/>risk score + approval stage deterministic<br/>LLM escalation draft → template fallback]
     ROUTE --> AUD[Audit Logger · deterministic<br/>SQLite upsert · full state JSON<br/>raw_document excluded]
 
-    ASM --> HITL{{interrupt_before · David reviews report + draft}}
+    ASM --> HITL{{interrupt_before · human reviews report + draft}}
     AUD --> HITL
     HITL --> DONE[Complete · status = COMPLETE]
     DONE --> ENDN([END])
@@ -98,7 +98,7 @@ a missing ruling, or any upstream failure; HIGH/MEDIUM proceed (MEDIUM is flagge
 
 **Human-in-the-loop.** The graph is compiled with `interrupt_before=["complete"]` and a
 SQLite checkpointer keyed by change-order id, so the pipeline pauses before completion,
-survives a restart, and resumes only after David approves.
+survives a restart, and resumes only after the reviewer approves.
 
 ---
 
@@ -174,7 +174,7 @@ Programmatic use:
 from change_order_agent.graph.run import process_change_order, approve_and_complete
 
 paused = process_change_order(state)   # runs to the human-review pause
-# ... David reviews paused.assembly.full_report and paused.assembly.escalation_draft ...
+# ... the reviewer reviews paused.assembly.full_report and paused.assembly.escalation_draft ...
 final = approve_and_complete(state.input.co_id)
 ```
 
