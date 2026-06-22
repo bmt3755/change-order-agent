@@ -212,6 +212,7 @@ def _assemble_report(
     sa = state.scope_analysis
     ce = state.cost_estimation
     ro = state.routing
+    rd = state.redaction
 
     lines = [
         "CHANGE ORDER STATUS REPORT",
@@ -238,6 +239,12 @@ def _assemble_report(
         "-" * 52,
         f"Requested:         {'${:,.0f}'.format(ex.dollar_amount_requested) if ex.dollar_amount_requested else 'not stated'}",
         f"Estimated range:   {'${:,.0f}–${:,.0f}'.format(ce.estimated_cost_low, ce.estimated_cost_high) if ce.estimated_cost_low and ce.estimated_cost_high else 'not available'}",
+        "",
+        "REDACTION",
+        "-" * 52,
+        f"PII scrubbed:      {rd.entities_scrubbed}",
+        f"Backstop catches:  {rd.residual_pii_found}",
+        f"Review:            {('REVIEW RECOMMENDED - ' + (rd.review_reason or '')) if rd.review_recommended else 'not flagged'}",
         "",
         f"Generated:         {datetime.now(timezone.utc).isoformat()}",
         f"Contract version:  {state.input.contract_version}",

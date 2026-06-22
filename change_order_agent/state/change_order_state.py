@@ -76,6 +76,14 @@ class ChangeOrderInput(BaseModel):
 # Agent output sections — one per agent, all fields optional until that agent runs
 # ---------------------------------------------------------------------------
 
+class RedactionOutput(BaseModel):
+    entities_scrubbed: int = 0          # PII spans Presidio removed
+    residual_pii_found: int = 0         # spans the regex backstop caught AFTER Presidio (= engine misses)
+    review_recommended: bool = False    # surface to the human reviewer — NOT a guarantee a name was missed
+    review_reason: Optional[str] = None
+    redacted_at: Optional[datetime] = None
+
+
 class ExtractionOutput(BaseModel):
     work_type: Optional[str] = None
     subcontractor_name: Optional[str] = None
@@ -177,6 +185,7 @@ class PipelineControl(BaseModel):
 
 class ChangeOrderState(BaseModel):
     input: ChangeOrderInput
+    redaction: RedactionOutput = Field(default_factory=RedactionOutput)
     extraction: ExtractionOutput = Field(default_factory=ExtractionOutput)
     retrieval: RetrievalOutput = Field(default_factory=RetrievalOutput)
     scope_analysis: ScopeAnalysisOutput = Field(default_factory=ScopeAnalysisOutput)

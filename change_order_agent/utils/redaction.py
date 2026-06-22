@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 
@@ -9,7 +11,11 @@ from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
-from ..state.change_order_state import ChangeOrderState, PipelineStatus
+from ..state.change_order_state import (
+    ChangeOrderState,
+    PipelineStatus,
+    RedactionOutput,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +57,36 @@ _ENTITY_TAGS: dict[str, str] = {
 # slightly less readable. When in doubt, scrub.
 SCORE_THRESHOLD = 0.30
 
+# ---------------------------------------------------------------------------
+# Backstop layer — runs AFTER Presidio, over the already-redacted text.
+#
+# These three identifiers have a fixed, unambiguous shape, so a plain regex can
+# catch odd-format spans Presidio's recognizers missed. A hit here means
+# Presidio let something through: we scrub it AND flag the change order for human
+# review. Patterns are kept narrow on purpose so they do NOT touch construction
+# data — dollar amounts ($24,500), dates (2024-06-10), or panel/room numbers.
+#
+# This backstop only covers STRUCTURED PII. A bare missed name with no contact
+# info nearby still cannot be detected — that is an inherent limit of NER, and
+# over-redaction plus human review remain the mitigation.
+# ---------------------------------------------------------------------------
+
+_RESIDUAL_PATTERNS: dict[str, re.Pattern[str]] = {
+    "EMAIL_ADDRESS": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+    "US_SSN":        re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    "PHONE_NUMBER":  re.compile(
+        r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"
+    ),
+}
+
+
+@dataclass
+class RedactionResult:
+    """Outcome of redacting one document."""
+    text: str
+    entities_scrubbed: int = 0   # spans Presidio removed
+    residual_found: int = 0      # spans the regex backstop caught after Presidio
+
 
 @lru_cache(maxsize=1)
 def _engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
@@ -65,15 +101,26 @@ def _engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
     return AnalyzerEngine(), AnonymizerEngine()
 
 
-def redact_text(text: str) -> tuple[str, int]:
-    """
-    Replace personal data in `text` with type tags.
+def _residual_scan(text: str) -> tuple[str, int]:
+    """Backstop sweep for structured PII that survived Presidio. Returns
+    (scrubbed_text, hits)."""
+    total = 0
+    for entity_type, pattern in _RESIDUAL_PATTERNS.items():
+        text, hits = pattern.subn(_ENTITY_TAGS[entity_type], text)
+        total += hits
+    return text, total
 
-    Returns (redacted_text, entities_scrubbed). Runs fully offline — the text
-    never leaves this machine.
+
+def redact_text(text: str) -> RedactionResult:
+    """
+    Replace personal data in `text` with type tags. Runs fully offline — the
+    text never leaves this machine.
+
+    Two layers: Presidio (names + contact + financial IDs), then a regex
+    backstop that catches structured PII Presidio missed.
     """
     if not text or not text.strip():
-        return text, 0
+        return RedactionResult(text=text)
 
     analyzer, anonymizer = _engines()
 
@@ -83,19 +130,24 @@ def redact_text(text: str) -> tuple[str, int]:
         entities=list(_ENTITY_TAGS),   # only look for what we intend to remove
         score_threshold=SCORE_THRESHOLD,
     )
-    if not results:
-        return text, 0
+    if results:
+        operators = {
+            entity_type: OperatorConfig("replace", {"new_value": tag})
+            for entity_type, tag in _ENTITY_TAGS.items()
+        }
+        text = anonymizer.anonymize(
+            text=text,
+            analyzer_results=results,
+            operators=operators,
+        ).text
 
-    operators = {
-        entity_type: OperatorConfig("replace", {"new_value": tag})
-        for entity_type, tag in _ENTITY_TAGS.items()
-    }
-    anonymized = anonymizer.anonymize(
+    text, residual = _residual_scan(text)
+
+    return RedactionResult(
         text=text,
-        analyzer_results=results,
-        operators=operators,
+        entities_scrubbed=len(results),
+        residual_found=residual,
     )
-    return anonymized.text, len(results)
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +162,15 @@ def run_redaction(state: ChangeOrderState) -> dict:
     Deterministic, offline, no LLM. Fail-closed: if redaction raises, the
     pipeline is marked FAILED and redacted_document is left unset, so the
     extraction agent's guard refuses to run on raw text.
+
+    If the regex backstop catches anything Presidio missed, the change order is
+    flagged for human review (surface-only — it does not halt the pipeline).
     """
     co_id = state.input.co_id
     logger.info("CO %s: redaction starting", co_id)
 
     try:
-        redacted, scrubbed = redact_text(state.input.raw_document)
+        result = redact_text(state.input.raw_document)
     except Exception as exc:
         # Fail-closed — never let raw text flow downstream on an error
         logger.error("CO %s: redaction failed — halting pipeline: %s", co_id, exc)
@@ -127,9 +182,28 @@ def run_redaction(state: ChangeOrderState) -> dict:
             }),
         }
 
-    logger.info("CO %s: redaction complete — %d entities scrubbed", co_id, scrubbed)
+    review_recommended = result.residual_found > 0
+    review_reason = (
+        f"{result.residual_found} PII span(s) caught by the regex backstop after "
+        "Presidio — possible engine miss; verify no personal data leaked"
+        if review_recommended else None
+    )
+
+    if review_recommended:
+        logger.warning("CO %s: redaction review recommended — %s", co_id, review_reason)
+    logger.info(
+        "CO %s: redaction complete — %d scrubbed, %d backstop catches",
+        co_id, result.entities_scrubbed, result.residual_found,
+    )
 
     return {
-        "input": state.input.model_copy(update={"redacted_document": redacted}),
+        "input": state.input.model_copy(update={"redacted_document": result.text}),
+        "redaction": RedactionOutput(
+            entities_scrubbed=result.entities_scrubbed,
+            residual_pii_found=result.residual_found,
+            review_recommended=review_recommended,
+            review_reason=review_reason,
+            redacted_at=datetime.now(timezone.utc),
+        ),
         "pipeline": state.pipeline.model_copy(update={"current_node": "redaction"}),
     }
