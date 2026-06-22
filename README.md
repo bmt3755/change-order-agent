@@ -1,7 +1,7 @@
 # Change Order Management Agent
 
-A multi-agent pipeline that triages construction **change orders** end to end: it extracts
-the key facts from a submitted document, checks the work against the project contract and
+A multi-agent pipeline that triages construction **change orders** end to end: it redacts
+personal data from the submitted document, extracts the key facts, checks the work against the project contract and
 against historical cost data, rules on whether the work is in or out of scope, scores risk,
 routes the order to the right approver, and writes a full audit record — then **pauses for a
 human to review before anything is finalized**.
@@ -24,7 +24,8 @@ branch point is a confidence gate, and a human-in-the-loop interrupt fires befor
 
 ```mermaid
 flowchart TD
-    A([Change order submitted]) --> EX[Extraction Agent<br/>parse key facts]
+    A([Change order submitted]) --> RED[Redaction<br/>scrub PII offline]
+    RED --> EX[Extraction Agent<br/>parse key facts]
 
     EX --> RET[Retrieval Agent<br/>RAG over contract]
     EX --> COST[Cost Estimation Agent<br/>RAG over historical COs]
@@ -48,6 +49,7 @@ flowchart TD
 
 | Node | Type | Responsibility |
 |---|---|---|
+| **Redaction** | Deterministic | Scrubs PII (names, emails, phones, government / financial IDs) from the raw document into a redacted copy using **Presidio, fully offline**. Keeps company names, dates, and locations. Runs first; fails closed. No LLM. |
 | **Extraction Agent** | LLM | Parses the redacted change order into structured facts (work type, subcontractor, dollar amount, description). Primary prompt → reduced fallback prompt → flag for human. |
 | **Retrieval Agent** | RAG | Embeds the extracted facts and retrieves relevant contract sections from ChromaDB, filtered to the order's org / project / contract version. |
 | **Cost Estimation Agent** | RAG + LLM | Retrieves comparable historical change orders, then estimates a fair cost range. |
@@ -66,7 +68,8 @@ pipeline status, which the gate then halts on.
 
 ```mermaid
 flowchart TD
-    START([START]) --> EX[Extraction Agent<br/>primary x2 → fallback → flag for review]
+    START([START]) --> RED[Redaction · deterministic<br/>Presidio offline + regex backstop<br/>scrub PII → fail-closed on error]
+    RED --> EX[Extraction Agent<br/>primary x2 → fallback → flag for review]
 
     EX --> RET[Retrieval Agent<br/>Chroma: contract_corpus, top_k=6<br/>filter: org + project + contract_version]
     EX --> COST[Cost Estimation Agent<br/>Chroma: historical_cos, top_k=4<br/>+ LLM cost range]
@@ -107,6 +110,7 @@ survives a restart, and resumes only after the reviewer approves.
 - **Orchestration:** LangGraph (state graph, conditional edge, parallel nodes, interrupt, checkpointing)
 - **LLM:** OpenAI `gpt-4o-mini` via the `openai` SDK, `temperature=0`, with `response_format` structured (Pydantic) parsing
 - **Embeddings / vector store:** OpenAI `text-embedding-3-small` + ChromaDB (persistent, metadata-filtered)
+- **PII redaction:** Microsoft Presidio (`presidio-analyzer` / `presidio-anonymizer`) + spaCy `en_core_web_lg`, fully offline; regex backstop for structured PII
 - **State & validation:** Pydantic v2 models with enums and validators
 - **Persistence:** SQLite — audit log (`audit.db`) and LangGraph checkpoints (`checkpoints.db`)
 - **Tracing:** LangSmith (optional)
@@ -128,6 +132,7 @@ change_order_agent/
 │   ├── routing_agent.py         # Tasks 5/6 — deterministic approver routing + package
 │   └── output_assembly_agent.py # Task 8 — risk score, report, escalation draft
 ├── utils/
+│   ├── redaction.py             # Task 0 — PII redaction (Presidio, offline, fail-closed)
 │   ├── retrieval_utils.py       # ChromaDB collection + retrieval helper
 │   ├── audit_logger.py          # Task 7 — SQLite audit trail
 │   ├── seed_contract_store.py   # One-time contract indexing
@@ -137,6 +142,7 @@ change_order_agent/
     └── run.py                   # Entry points: run, approve/resume, query state, reject/halt
 tests/
 ├── test_smoke.py                # 18 tests — no network: schema, gate, routing, risk, graph compile
+├── test_redaction.py            # 10 tests — offline (loads Presidio): scrub, backstop, flag, fail-closed
 ├── test_e2e.py                  # 2 tests — full pipeline (requires a live OPENAI_API_KEY)
 └── data/                        # Sample contract + historical COs (illustrative)
 ```
@@ -147,6 +153,7 @@ tests/
 
 ```bash
 pip install -r requirements.txt
+python -m spacy download en_core_web_lg   # ~400 MB model for offline PII redaction
 cp .env.example .env          # add your real OPENAI_API_KEY
 
 # Seed the vector stores (one-time)
@@ -161,8 +168,8 @@ python -m change_order_agent.utils.seed_historical_store \
 ## Running
 
 ```bash
-# Smoke tests — no API calls, no tokens spent
-python -m pytest tests/test_smoke.py -q
+# Offline tests — no API calls, no tokens spent (redaction tests load the Presidio model)
+python -m pytest tests/test_smoke.py tests/test_redaction.py -q
 
 # End-to-end — runs a real change order through the pipeline (needs a live OPENAI_API_KEY)
 python -m pytest tests/test_e2e.py -v -s
@@ -182,9 +189,13 @@ final = approve_and_complete(state.input.co_id)
 
 ## Security & privacy
 
-- **PII separation.** The input schema stores `raw_document` and `redacted_document`
-  separately. Agents only ever process the redacted version, and the audit log explicitly
-  excludes `raw_document` from the stored snapshot.
+- **PII redaction (active, offline).** A redaction node runs **first**, before any agent,
+  scrubbing personal data (names, emails, phones, government / financial IDs) from
+  `raw_document` into `redacted_document` with Microsoft Presidio — **fully offline**, so raw
+  text never leaves the machine. Business data (company names, dates, locations) is kept; a
+  regex backstop catches structured-PII misses and flags the order for human review.
+  Redaction **fails closed** — on error the pipeline halts rather than leak raw text. Agents
+  only ever process the redacted version, and the audit log excludes `raw_document`.
 - **Tenant isolation.** Every retrieval is filtered by `org_id` / `project_id` /
   `contract_version`, so an order can only see its own contract data.
 - **No secrets in the repo.** Real keys live in `.env` (gitignored); only `.env.example`
