@@ -105,11 +105,12 @@ while still preserving a complete decision record.
 
 ### 12. A standalone, deterministic audit logger captures the full decision record
 **Technical reason:** Audit logging is its own node (not a side effect of another step). It is
-LLM-free, writes an idempotent upsert keyed on change-order id with indexes and a
-`schema_version`, and stores the full state JSON. Routing decisions are likewise deterministic
-(a dollar-threshold rules table), so the record they produce is reproducible.
-**Business consequence:** Every order has one complete, attributable, replayable record even if
-an earlier step failed — and the routing decision in it can be re-derived from the rules.
+LLM-free, **appends a new immutable row per run** (append-only — it never overwrites) with
+indexes and a `schema_version`, and stores the full state JSON. Routing decisions are likewise
+deterministic (a dollar-threshold rules table), so the record they produce is reproducible.
+**Business consequence:** Every order keeps a complete, attributable, replayable **history** —
+re-processing adds a new record rather than erasing the prior one — and the routing decision in
+it can be re-derived from the rules.
 **Risk / cost impact:** Reduces dispute-defense risk (an incomplete log loses disputes).
 Improves auditability and maintainability.
 

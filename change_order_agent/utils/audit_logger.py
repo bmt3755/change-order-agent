@@ -14,15 +14,26 @@ from ..state.change_order_state import AuditReference, ChangeOrderState
 logger = logging.getLogger(__name__)
 
 AUDIT_DB_PATH = os.environ.get("AUDIT_DB_PATH", "./audit.db")
-SCHEMA_VERSION = "1.0"  # increment when state schema changes
+SCHEMA_VERSION = "2.0"  # bumped: audit_log is now append-only (was upsert keyed on co_id)
 
 # ---------------------------------------------------------------------------
 # DDL — table and indexes created automatically on first run
+#
+# Append-only: every run INSERTs a new immutable row; we never overwrite, so the
+# full history of a change order is preserved — a legal audit trail must be
+# immutable. "Current state of CO X" = the most recent row (highest id / logged_at).
+#
+# Growth note: at this scale (a few hundred change orders) the table stays tiny
+# and SQLite handles it easily. If it ever grows large, manage size with
+# cold-storage archival/retention — move old rows to a separate, still-retrievable
+# archive store — NEVER by overwriting or deleting, which would destroy the
+# evidence this log exists to preserve.
 # ---------------------------------------------------------------------------
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS audit_log (
-    co_id                 TEXT PRIMARY KEY,
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    co_id                 TEXT NOT NULL,
     project_id            TEXT NOT NULL,
     org_id                TEXT NOT NULL,
     contract_version      TEXT NOT NULL,
@@ -47,13 +58,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
 """
 
 _CREATE_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_co_id          ON audit_log(co_id, logged_at)",
     "CREATE INDEX IF NOT EXISTS idx_project        ON audit_log(project_id)",
     "CREATE INDEX IF NOT EXISTS idx_scope_ruling   ON audit_log(scope_ruling)",
     "CREATE INDEX IF NOT EXISTS idx_risk_score     ON audit_log(risk_score)",
     "CREATE INDEX IF NOT EXISTS idx_approval_stage ON audit_log(approval_stage)",
 ]
 
-_UPSERT = """
+_INSERT = """
 INSERT INTO audit_log (
     co_id, project_id, org_id, contract_version, submission_timestamp,
     logged_at, schema_version, scope_ruling, confidence_score, confidence_tier,
@@ -67,23 +79,6 @@ INSERT INTO audit_log (
     :routing_executed, :risk_score, :approval_stage, :pipeline_status, :error_message,
     :full_state_json
 )
-ON CONFLICT(co_id) DO UPDATE SET
-    logged_at             = excluded.logged_at,
-    schema_version        = excluded.schema_version,
-    scope_ruling          = excluded.scope_ruling,
-    confidence_score      = excluded.confidence_score,
-    confidence_tier       = excluded.confidence_tier,
-    contract_clause_cited = excluded.contract_clause_cited,
-    cost_low              = excluded.cost_low,
-    cost_high             = excluded.cost_high,
-    approver_level        = excluded.approver_level,
-    department            = excluded.department,
-    routing_executed      = excluded.routing_executed,
-    risk_score            = excluded.risk_score,
-    approval_stage        = excluded.approval_stage,
-    pipeline_status       = excluded.pipeline_status,
-    error_message         = excluded.error_message,
-    full_state_json       = excluded.full_state_json
 """
 
 
@@ -132,12 +127,14 @@ def _build_record(state: ChangeOrderState) -> dict:
 
 
 def _write_record(record: dict) -> Optional[str]:
-    """Write record to SQLite inside a transaction. Returns co_id or None on failure."""
+    """Append one immutable row inside a transaction. Returns the new row id
+    (the unique audit_log_id) or None on failure."""
     try:
         with sqlite3.connect(AUDIT_DB_PATH) as conn:
             _init_db(conn)
-            conn.execute(_UPSERT, record)
-        return record["co_id"]
+            cursor = conn.execute(_INSERT, record)
+            row_id = cursor.lastrowid
+        return str(row_id)
     except sqlite3.Error as exc:
         logger.error("Audit write failed for CO %s: %s", record.get("co_id"), exc)
         return None

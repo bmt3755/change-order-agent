@@ -56,7 +56,7 @@ flowchart TD
 | **Scope Analysis Agent** | LLM | Rules `IN_SCOPE` / `OUT_OF_SCOPE` / `AMBIGUOUS` with a confidence score and a **required contract-clause citation**. Applies a narrow-exclusion rule so an exclusion is never expanded beyond its literal text. |
 | **Routing Agent** | Deterministic | Picks the approver from dollar thresholds (out-of-scope always routes to the owner) and maps work type to a department. No LLM. |
 | **Output Assembly Agent** | Deterministic + LLM | Computes a risk score and approval stage (deterministic), then drafts an escalation email (LLM, with a template fallback). The draft is held for review — never auto-sent. |
-| **Audit Logger** | Deterministic | Writes the full state snapshot to SQLite (idempotent upsert keyed on change-order id). No LLM. |
+| **Audit Logger** | Deterministic | Appends the full state snapshot to SQLite as a new immutable row per run (**append-only** — never overwrites, so history is preserved). No LLM. |
 
 ### Detailed flow
 
@@ -82,7 +82,7 @@ flowchart TD
     GATE -->|HIGH or MEDIUM| ROUTE[Routing Agent · deterministic<br/>$ thresholds; OUT_OF_SCOPE → OWNER<br/>missing inputs → flag for review]
 
     ROUTE --> ASM[Output Assembly Agent<br/>risk score + approval stage deterministic<br/>LLM escalation draft → template fallback]
-    ROUTE --> AUD[Audit Logger · deterministic<br/>SQLite upsert · full state JSON<br/>raw_document excluded]
+    ROUTE --> AUD[Audit Logger · deterministic<br/>SQLite append-only · full state JSON<br/>raw_document excluded]
 
     ASM --> HITL{{interrupt_before · human reviews report + draft}}
     AUD --> HITL
@@ -141,8 +141,9 @@ change_order_agent/
     ├── graph.py                 # Graph wiring, confidence gate, interrupt, completion node
     └── run.py                   # Entry points: run, approve/resume, query state, reject/halt
 tests/
-├── test_smoke.py                # 18 tests — no network: schema, gate, routing, risk, graph compile
+├── test_smoke.py                # 19 tests — no network: schema, gate, routing, risk, graph compile, llm client
 ├── test_redaction.py            # 10 tests — offline (loads Presidio): scrub, backstop, flag, fail-closed
+├── test_audit.py                # 3 tests — offline (temp SQLite): append-only, unique row id, no raw doc
 ├── test_e2e.py                  # 2 tests — full pipeline (requires a live OPENAI_API_KEY)
 └── data/                        # Sample contract + historical COs (illustrative)
 ```
