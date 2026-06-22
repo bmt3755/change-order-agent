@@ -20,6 +20,7 @@ from ..state.change_order_state import (
     PipelineStatus,
 )
 from ..utils.audit_logger import run_audit_logger
+from ..utils.redaction import run_redaction
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ def build_graph() -> StateGraph:
     builder = StateGraph(ChangeOrderState)
 
     # --- Nodes ---
+    builder.add_node("redaction",             run_redaction)
     builder.add_node("extraction_agent",      run_extraction_agent)
     builder.add_node("retrieval_agent",        run_retrieval_agent)
     builder.add_node("cost_estimation_agent",  run_cost_estimation_agent)
@@ -111,8 +113,9 @@ def build_graph() -> StateGraph:
 
     # --- Edges ---
 
-    # Task 1 — extraction runs first
-    builder.add_edge(START, "extraction_agent")
+    # Task 0 — redaction runs first; no agent sees raw text
+    builder.add_edge(START, "redaction")
+    builder.add_edge("redaction", "extraction_agent")
 
     # Tasks 2 and 4 — parallel fan-out after extraction (Step 4, Window 1)
     builder.add_edge("extraction_agent", "retrieval_agent")

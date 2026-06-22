@@ -82,7 +82,7 @@ def _make_e2e_state(co_id: str, document: str):
             contract_version=CONTRACT_VERSION,
             cache_version=CACHE_VERSION,
             raw_document=document,
-            redacted_document=document,  # no PII in test doc
+            redacted_document=None,  # the redaction node fills this from raw_document
         )
     )
 
@@ -99,6 +99,9 @@ def test_in_scope_co_runs_full_pipeline(capsys):
     Project: Mission Bay Hospital
     Subcontractor: Pacific Electrical Contractors Inc.
     Date: 2024-06-10
+
+    Submitted by: Maria Gonzalez, Project Lead
+    Contact: maria.gonzalez@pacificelec.com, (415) 555-0147
 
     Description:
     Additional electrical conduit runs and receptacle installations in the
@@ -135,6 +138,13 @@ def test_in_scope_co_runs_full_pipeline(capsys):
     if result.assembly.escalation_draft:
         print(f"\n{'='*52}")
         print(result.assembly.escalation_draft)
+
+    # Redaction proof — PII was scrubbed from the document agents saw,
+    # but the original raw_document is preserved for the legal record.
+    assert result.input.redacted_document is not None, "Redaction must have run"
+    assert "Maria Gonzalez" not in result.input.redacted_document, "Person name must be redacted"
+    assert "maria.gonzalez@pacificelec.com" not in result.input.redacted_document, "Email must be redacted"
+    assert "Maria Gonzalez" in result.input.raw_document, "Raw document must be preserved untouched"
 
     # Assertions
     assert result.scope_analysis.scope_ruling is not None, "Scope ruling must be set"
