@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from langsmith import traceable
-from openai import OpenAI
 from pydantic import BaseModel
 
 from ..state.change_order_state import (
@@ -18,10 +17,11 @@ from ..state.change_order_state import (
     AssemblyOutput,
     ScopeRuling,
 )
+from ..utils.llm import get_client
 
 logger = logging.getLogger(__name__)
 
-client = OpenAI()
+client = get_client()  # bounded timeout + retries (utils/llm.py)
 MODEL = "gpt-4o-mini"
 MAX_DRAFT_ATTEMPTS = 2
 

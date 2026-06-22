@@ -5,18 +5,18 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from langsmith import traceable
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from ..state.change_order_state import (
     ChangeOrderState,
     CostEstimationOutput,
 )
+from ..utils.llm import get_client
 from ..utils.retrieval_utils import HISTORICAL_COLLECTION, retrieve
 
 logger = logging.getLogger(__name__)
 
-client = OpenAI()
+client = get_client()  # bounded timeout + retries (utils/llm.py)
 MODEL = "gpt-4o-mini"
 TOP_K_HISTORICAL = 4  # fewer comparables needed than contract sections
 

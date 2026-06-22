@@ -226,3 +226,16 @@ def test_graph_compiles_with_memory_saver():
         interrupt_before=["complete"],
     )
     assert compiled is not None
+
+
+# ---------------------------------------------------------------------------
+# LLM client — bounded timeout and retries (resilience)
+# ---------------------------------------------------------------------------
+
+def test_llm_client_has_bounded_timeout():
+    """Every agent shares one client with an explicit timeout, not the SDK's 600s default."""
+    from change_order_agent.utils.llm import get_client, REQUEST_TIMEOUT, MAX_RETRIES
+    client = get_client()
+    assert client.timeout == REQUEST_TIMEOUT
+    assert client.max_retries == MAX_RETRIES
+    assert REQUEST_TIMEOUT <= 60  # fail-fast — well under the 600s SDK default
