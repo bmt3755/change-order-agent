@@ -113,6 +113,33 @@ an earlier step failed — and the routing decision in it can be re-derived from
 **Risk / cost impact:** Reduces dispute-defense risk (an incomplete log loses disputes).
 Improves auditability and maintainability.
 
+### 13. Active PII redaction runs first, offline, and fails closed
+**Technical reason:** A dedicated redaction node runs before any agent (the first node in the
+graph). It uses Microsoft Presidio fully offline to scrub person names, emails, phones, and
+government / financial identifiers from `raw_document` into `redacted_document`, replacing each
+with a typed tag. Company names, dates, and work locations are deliberately kept. If redaction
+raises, the node fails closed — the pipeline halts and `redacted_document` is never set, so the
+extraction guard refuses to run on raw text. (This is what makes decision 11 real rather than
+assumed: redaction is now performed, not just structurally separated.)
+**Business consequence:** Personal data is actually removed before any agent or third-party LLM
+sees the document, while the business-critical content (who the subcontractor is, where and when
+the work happens) survives so the report stays usable. A redaction failure stops the order
+instead of leaking the raw text.
+**Risk / cost impact:** Reduces privacy / PII-exposure and compliance risk. Runs offline, so it
+adds no third-party data-sharing exposure.
+
+### 14. Defense-in-depth backstop plus a human-review flag for redaction misses
+**Technical reason:** After Presidio, a narrow regex backstop sweeps the redacted text for
+email / SSN / phone shapes that survived (odd-format misses), scrubs them, and counts them. The
+patterns are scoped to avoid construction data (dollar amounts, dates, panel / room numbers). A
+backstop hit sets `review_recommended` on a `RedactionOutput` state section and is surfaced in
+the status report the reviewer already reads — surface-only, it does not halt the pipeline.
+**Business consequence:** A structured-PII miss is caught and made visible to the reviewer
+instead of slipping through silently, without burying the reviewer in halts that would erase the
+time savings. An honest limit remains: a bare missed name with no nearby contact info cannot be
+auto-detected, so over-redaction plus human review stay the mitigation.
+**Risk / cost impact:** Reduces residual PII-leak risk while preserving throughput (no hard halt).
+
 ---
 
 ## Summary
@@ -131,3 +158,5 @@ Improves auditability and maintainability.
 | 10 | Primary → fallback → flag handling | extraction / scope / routing / assembly | Wrong-output risk ↓ · reliability ↑ |
 | 11 | PII separation (raw vs redacted) | `state/...`, `utils/audit_logger.py` | Privacy / PII exposure ↓ |
 | 12 | Standalone deterministic audit + routing | `utils/audit_logger.py`, `agents/routing_agent.py` | Dispute-defense ↓ · auditability ↑ |
+| 13 | Active PII redaction first, offline, fail-closed | `utils/redaction.py`, `graph/graph.py` | Privacy / PII exposure ↓ · compliance ↓ |
+| 14 | Redaction backstop + human-review flag | `utils/redaction.py`, `agents/output_assembly_agent.py` | Residual PII leak ↓ · throughput preserved |
