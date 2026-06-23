@@ -181,6 +181,22 @@ class PipelineControl(BaseModel):
 
 # ---------------------------------------------------------------------------
 # Root state — the single object LangGraph passes between every node
+#
+# CONCURRENCY DESIGN — why there are no Annotated reducers:
+# Two pairs of nodes run in parallel (retrieval + cost_estimation; assembly +
+# audit). LangGraph raises if two nodes write the SAME field in one step unless
+# that field declares a reducer (a merge rule). We keep concurrency safe a
+# simpler way: each parallel node writes ONLY its own output section, so the
+# pairs touch disjoint fields and can never collide. The shared `pipeline`
+# control field is written only by SEQUENTIAL nodes.
+#
+# Reducers were considered and deliberately NOT used:
+#   - A reducer runs on EVERY write, not just concurrent ones — so a merge rule
+#     on `pipeline` would corrupt its normal sequential transitions
+#     (e.g. RUNNING -> COMPLETE), not just guard against collisions.
+#   - Reducers on the per-agent sections would be decorative: each section has a
+#     single writer, so there is nothing to merge.
+# The single-writer invariant is enforced by tests/test_parallel_safety.py.
 # ---------------------------------------------------------------------------
 
 class ChangeOrderState(BaseModel):

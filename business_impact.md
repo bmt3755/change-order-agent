@@ -57,7 +57,9 @@ channel. A wrong or premature email never reaches an owner or subcontractor on i
 ### 6. Loose coupling: parallel agents write only their own section, never pipeline control
 **Technical reason:** Agents that run inside a parallel window (retrieval, cost estimation,
 assembly, audit) write only to their own output section and record failures in their own
-`error` field. Only sequential nodes mutate `pipeline`. This is explicit and commented in code.
+`error` field. Only sequential nodes mutate `pipeline`. This is explicit, commented in code, and
+enforced by an offline test (`tests/test_parallel_safety.py`); reducers were considered and
+deliberately not used (a reducer on `pipeline` would corrupt its sequential transitions).
 **Business consequence:** Two agents running at once cannot clobber the shared control status,
 and each agent's output is attributable to that agent.
 **Risk / cost impact:** Reduces concurrency / race-condition risk. Improves auditability.
